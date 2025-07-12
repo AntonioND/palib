@@ -1,64 +1,64 @@
 /* FAT functions....
 */
 
-// Includes
 #include <PA9.h>       // Include for PA_Lib
 #include <fat.h>
-#include <sys/dir.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
-// Function: main()
-int main()
+int main(int argc, char *argv[])
 {
-	PA_Init();    // Initializes PA_Lib
-	
-	PA_LoadDefaultText(0, 0);  // Initialise the text system on the bottom screen	
-	
-	PA_LoadDefaultText(1, 0);  // Initialise the text system on the top screen
-	
-	PA_WaitForVBL();  PA_WaitForVBL();  PA_WaitForVBL();  // wait a few VBLs
-	
-	fatInitDefault(); //Initialise fat library
+    PA_Init();
 
-	// The following code was pulled from 
-	// http://chishm.drunkencoders.com/libfat/index.html
-	// It has been slightly modified...
-	int linenumber =0; 
-	int screen = 1;
+    PA_LoadDefaultText(0, 0); // Initialise the text system on the bottom screen
+    PA_LoadDefaultText(1, 0); // Initialise the text system on the top screen
 
-	struct stat st;
-	char filename[256]; // to hold a full filename and string terminator
-	DIR_ITER* dir = diropen("/");
+    if (!fatInitDefault()) // Initialise fat library
+    {
+        PA_OutputText(1, 1, 1, "Can't initialize FAT");
+        while (1)
+            PA_WaitForVBL();
+    }
 
-	if (dir == NULL) 
-	{
-		PA_OutputText(1,2,2,"Unable to open the directory.");
-	} 
-	else 
-	while (dirnext(dir, filename, &st) == 0) 
-	{
-	   if (linenumber ==24) //if we hit this twice we are overwriting on the bottom screen :(
-		{ 
-		   screen=0; //Output on bottom if we filled the top screen
-		   linenumber = 0; //reset line number...
-		}   
-		// st.st_mode & S_IFDIR indicates a directory
-		PA_OutputText(screen,0,linenumber, "%02d%s: %s\n", linenumber, (st.st_mode & S_IFDIR ? "D" : "-"), filename);
-		linenumber++;//next line
-	}
-	//nothing to do but wait....
-	while (1)
-	{ 
-			
-		PA_WaitForVBL();
-	}
-	
-	return 0;
-} // End of main()
+    DIR *dirp = opendir("/");
+    if (dirp == NULL)
+    {
+        PA_OutputText(1, 1, 1, "Unable to open the directory.");
+        while (1)
+            PA_WaitForVBL();
+    }
 
+    int linenumber = 0;
+    int screen = 1;
 
+    while (1)
+    {
+        struct dirent *cur = readdir(dirp);
+        if (cur == NULL)
+            break;
 
+        if (strlen(cur->d_name) == 0)
+            break;
 
+        // If we hit this twice we are overwriting on the bottom screen :(
+        if (linenumber == 24)
+        {
+            screen = 0; // Output on bottom if we filled the top screen
+            linenumber = 0; // Reset line number...
+        }
 
+        // "cur->d_type == DT_DIR" indicates a directory
+        PA_OutputText(screen, 0, linenumber, "%02d%s: %s\n",
+                      linenumber, (cur->d_type == DT_DIR) ? "D" : "-",
+                      cur->d_name);
 
+        linenumber++; // Next line
+    }
 
+    closedir(dirp);
 
+    while (1)
+        PA_WaitForVBL();
+
+    return 0;
+}
